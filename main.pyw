@@ -1,54 +1,71 @@
 import os
-import pyttsx3
+import wave
+import struct
+import win32com.client
 import speech_recognition as sr
 import ollama
-import pvporcupine
 from pvrecorder import PvRecorder
 
-from config import PICOVOICE_ACCESS_KEY, MODEL_NAME
+from config import MODEL_NAME
 from tools import tools_list, tools_map
 
-engine = pyttsx3.init()
-engine.setProperty('rate', 170)
+# Initialize Direct Windows SAPI Voice Driver
+speaker = win32com.client.Dispatch("SAPI.SpVoice")
 
 def speak(text: str):
     print(f"\nJARVIS: {text}")
-    engine.say(text)
-    engine.runAndWait()
+    try:
+        speaker.Speak(text)
+    except Exception as e:
+        print(f"[TTS Error]: {e}")
 
-def listen(timeout_secs=5) -> str:
+def listen_pvrecorder(recorder, timeout_secs=5) -> str:
+    """Listens to microphone using PvRecorder and converts speech to text."""
     recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        print("\n[ Listening... ]")
-        recognizer.adjust_for_ambient_noise(source, duration=0.3)
-        try:
-            audio = recognizer.listen(source, timeout=timeout_secs)
-            query = recognizer.recognize_google(audio)
-            print(f"You: {query}")
-            return query
-        except Exception:
-            return ""
-
-def confirm_permission(action_description: str) -> bool:
-    """Asks the user for explicit permission before executing any system tool."""
-    speak(f"Boss, you requested to {action_description}. Do I have your permission to proceed?")
-    user_response = listen(timeout_secs=4).lower()
+    frames = []
+    print("\n[ Listening... ]")
     
-    # Strictly require explicit positive confirmation
-    if any(word in user_response for word in ["yes", "yeah", "sure", "proceed", "do it", "confirm", "ok"]):
+    recorder.start()
+    try:
+        max_frames = int((recorder.sample_rate / recorder.frame_length) * timeout_secs)
+        for _ in range(max_frames):
+            frame = recorder.read()
+            frames.extend(frame)
+    finally:
+        recorder.stop()
+
+    byte_data = struct.pack("<" + "h" * len(frames), *frames)
+    audio_data = sr.AudioData(byte_data, recorder.sample_rate, 2)
+
+    try:
+        query = recognizer.recognize_google(audio_data)
+        print(f"You: {query}")
+        return query
+    except Exception:
+        return ""
+
+def confirm_permission(action_description: str, recorder) -> bool:
+    """Asks user for verbal confirmation before executing any tool.
+    Strictly denies execution unless an explicit positive confirmation word is present.
+    """
+    speak(f"Boss, you requested to {action_description}. Do I have your permission to proceed?")
+    
+    user_response = listen_pvrecorder(recorder, timeout_secs=5).strip().lower()
+    
+    allowed_words = [
+        "yes", "yeah", "sure", "proceed", "do it", "confirm", "ok", "okay",
+        "permission", "granted", "go ahead", "allow", "approved"
+    ]
+    
+    if user_response and any(word in user_response for word in allowed_words):
+        speak("Permission granted. Executing now, boss.")
         return True
     
-    speak("Action canceled, boss.")
+    speak("Permission denied. Action canceled, boss.")
     return False
 
 def run_jarvis():
-    porcupine = pvporcupine.create(
-        access_key=PICOVOICE_ACCESS_KEY,
-        keywords=["jarvis"]
-    )
-    recorder = PvRecorder(frame_length=porcupine.frame_length)
-    recorder.start()
-
+    recorder = PvRecorder(frame_length=512)
     messages = [
         {
             "role": "system",
@@ -60,65 +77,60 @@ def run_jarvis():
         }
     ]
 
-    speak("JARVIS systems active in background with permission controls enabled.")
+    speak("JARVIS systems active and ready, boss.")
 
     try:
         while True:
-            pcm = recorder.read()
-            if porcupine.process(pcm) >= 0:
-                speak("Yes, boss?")
-                recorder.stop()
+            user_input = listen_pvrecorder(recorder, timeout_secs=6)
+            
+            if user_input:
+                if any(w in user_input.lower() for w in ["exit", "shutdown", "stop", "sleep", "go offline"]):
+                    speak("Going offline, boss.")
+                    break
 
-                user_input = listen()
-                if user_input:
-                    if any(w in user_input.lower() for w in ["exit", "shutdown", "stop", "sleep"]):
-                        speak("Going offline, boss.")
-                        break
+                messages.append({"role": "user", "content": user_input})
 
-                    messages.append({"role": "user", "content": user_input})
+                response = ollama.chat(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    tools=tools_list
+                )
 
-                    response = ollama.chat(
-                        model=MODEL_NAME,
-                        messages=messages,
-                        tools=tools_list
-                    )
+                if response.get("message", {}).get("tool_calls"):
+                    for tool_call in response["message"]["tool_calls"]:
+                        fn_name = tool_call["function"]["name"]
+                        args = tool_call["function"]["arguments"]
 
-                    # Check if Ollama wants to call a tool
-                    if response.get("message", {}).get("tool_calls"):
-                        for tool_call in response["message"]["tool_calls"]:
-                            fn_name = tool_call["function"]["name"]
-                            args = tool_call["function"]["arguments"]
+                        if fn_name in tools_map:
+                            action_desc = f"execute {fn_name}"
+                            if fn_name == "open_website":
+                                action_desc = f"open {args.get('url', 'the website')}"
+                            elif fn_name == "play_youtube":
+                                action_desc = f"play '{args.get('topic', '')}' on YouTube"
+                            elif fn_name == "set_volume":
+                                action_desc = f"set system volume to {args.get('level', '')}%"
+                            elif fn_name == "take_screenshot":
+                                action_desc = "take a screenshot"
+                            elif fn_name == "open_app":
+                                action_desc = f"open the application {args.get('app_name', '')}"
 
-                            if fn_name in tools_map:
-                                action_desc = f"execute {fn_name}"
-                                if fn_name == "open_website":
-                                    action_desc = f"open {args.get('url', 'the website')}"
-                                elif fn_name == "play_youtube":
-                                    action_desc = f"play '{args.get('topic', '')}' on YouTube"
-                                elif fn_name == "set_volume":
-                                    action_desc = f"set system volume to {args.get('level', '')}%"
-
-                                # PERMISSION GUARD
-                                if confirm_permission(action_desc):
-                                    result = tools_map[fn_name](**args)
-                                    speak(result)
-                                    messages.append(response["message"])
-                                    messages.append({
-                                        "role": "tool",
-                                        "content": result,
-                                        "name": fn_name
-                                    })
-                    else:
-                        reply = response["message"]["content"]
-                        speak(reply)
-                        messages.append({"role": "assistant", "content": reply})
-
-                recorder.start()
+                            # STRICT PERMISSION GUARD
+                            if confirm_permission(action_desc, recorder):
+                                result = tools_map[fn_name](**args)
+                                speak(result)
+                                messages.append(response["message"])
+                                messages.append({
+                                    "role": "tool",
+                                    "content": result,
+                                    "name": fn_name
+                                })
+                else:
+                    reply = response["message"]["content"]
+                    speak(reply)
+                    messages.append({"role": "assistant", "content": reply})
 
     finally:
-        recorder.stop()
         recorder.delete()
-        porcupine.delete()
 
 if __name__ == "__main__":
     run_jarvis()

@@ -4,6 +4,7 @@ import webbrowser
 import pyautogui
 import pywhatkit
 import psutil
+from datetime import datetime
 
 try:
     from ctypes import POINTER, cast
@@ -45,11 +46,59 @@ def get_system_stats() -> str:
     percent = battery.percent if battery else "Unknown"
     return f"Battery is at {percent} percent, CPU usage is {cpu} percent."
 
-tools_list = [open_website, play_youtube, set_volume, get_system_stats, search_personal_notes]
+def take_screenshot() -> str:
+    """Takes a full-screen screenshot and saves it to the local screenshots folder."""
+    folder = "screenshots"
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    
+    filename = datetime.now().strftime("screenshot_%Y%m%d_%H%M%S.png")
+    filepath = os.path.join(folder, filename)
+    
+    screenshot = pyautogui.screenshot()
+    screenshot.save(filepath)
+    return f"Screenshot saved successfully to {filepath}."
+
+def open_app(app_name: str) -> str:
+    """Launches local desktop applications like Notepad, Calculator, VS Code, or File Explorer."""
+    app_map = {
+        "notepad": "notepad.exe",
+        "calculator": "calc.exe",
+        "calc": "calc.exe",
+        "explorer": "explorer.exe",
+        "file explorer": "explorer.exe",
+        "cmd": "cmd.exe",
+        "terminal": "cmd.exe",
+        "code": "code",
+        "vscode": "code",
+    }
+    
+    name = app_name.lower().strip()
+    executable = app_map.get(name, name)
+    
+    try:
+        subprocess.Popen(executable, shell=True)
+        return f"Opened application {app_name}."
+    except Exception as e:
+        return f"Could not launch application {app_name}: {str(e)}"
+
+# Register tools for Ollama
+tools_list = [
+    open_website,
+    play_youtube,
+    set_volume,
+    get_system_stats,
+    search_personal_notes,
+    take_screenshot,
+    open_app
+]
+
 tools_map = {
     "open_website": open_website,
     "play_youtube": play_youtube,
     "set_volume": set_volume,
     "get_system_stats": get_system_stats,
-    "search_personal_notes": search_personal_notes
+    "search_personal_notes": search_personal_notes,
+    "take_screenshot": take_screenshot,
+    "open_app": open_app
 }
