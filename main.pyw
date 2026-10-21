@@ -70,9 +70,9 @@ def run_jarvis():
         {
             "role": "system",
             "content": (
-                "You are JARVIS, a helpful local AI assistant. "
-                "Keep verbal responses concise, direct, and clear. "
-                "Use available tools to perform laptop actions or search personal notes."
+                "You are JARVIS, a concise local voice assistant. "
+                "Answer questions directly in one short sentence. "
+                "Never mention tools, code, or search queries unless asked."
             )
         }
     ]
@@ -84,16 +84,31 @@ def run_jarvis():
             user_input = listen_pvrecorder(recorder, timeout_secs=6)
             
             if user_input:
-                if any(w in user_input.lower() for w in ["exit", "shutdown assistant", "stop", "sleep", "go offline"]):
+                user_lower = user_input.lower()
+
+                if any(w in user_lower for w in ["exit", "shutdown assistant", "stop", "sleep", "go offline"]):
                     speak("Going offline, boss.")
                     break
 
                 messages.append({"role": "user", "content": user_input})
 
+                # STRICT ACTION TRIGGER CHECK:
+                # Tools will ONLY be passed to Ollama if explicit action trigger words are spoken.
+                action_triggers = [
+                    "open", "launch", "play", "volume", "screenshot", 
+                    "close", "minimize", "shutdown", "restart", "lock", 
+                    "my notes", "my files", "search notes", "website"
+                ]
+
+                has_action_trigger = any(trigger in user_lower for trigger in action_triggers)
+
+                # Pass tools ONLY if an action trigger word is present
+                active_tools = tools_list if has_action_trigger else None
+
                 response = ollama.chat(
                     model=MODEL_NAME,
                     messages=messages,
-                    tools=tools_list
+                    tools=active_tools
                 )
 
                 if response.get("message", {}).get("tool_calls"):
@@ -119,6 +134,8 @@ def run_jarvis():
                                 action_desc = "minimize all open windows"
                             elif fn_name == "system_power_control":
                                 action_desc = f"perform system {args.get('action', 'power action')}"
+                            elif fn_name == "search_personal_notes":
+                                action_desc = f"search personal notes for '{args.get('query', '')}'"
 
                             # STRICT PERMISSION GUARD
                             if confirm_permission(action_desc, recorder):
