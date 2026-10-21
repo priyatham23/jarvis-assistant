@@ -82,6 +82,30 @@ def open_app(app_name: str) -> str:
     except Exception as e:
         return f"Could not launch application {app_name}: {str(e)}"
 
+def close_active_window() -> str:
+    """Closes the currently focused active window or application tab."""
+    pyautogui.hotkey('alt', 'f4')
+    return "Closed active window."
+
+def minimize_all_windows() -> str:
+    """Minimizes all open windows to show the desktop."""
+    pyautogui.hotkey('win', 'd')
+    return "Minimized all windows."
+
+def system_power_control(action: str) -> str:
+    """Controls laptop power states: shutdown, restart, or lock screen."""
+    act = action.lower().strip()
+    if "shutdown" in act:
+        os.system("shutdown /s /t 10")
+        return "Initiating laptop shutdown in 10 seconds."
+    elif "restart" in act:
+        os.system("shutdown /r /t 10")
+        return "Initiating laptop restart in 10 seconds."
+    elif "lock" in act:
+        os.system("rundll32.exe user32.dll,LockWorkStation")
+        return "Laptop locked."
+    return f"Unknown power action: {action}"
+
 # Register tools for Ollama
 tools_list = [
     open_website,
@@ -90,7 +114,10 @@ tools_list = [
     get_system_stats,
     search_personal_notes,
     take_screenshot,
-    open_app
+    open_app,
+    close_active_window,
+    minimize_all_windows,
+    system_power_control
 ]
 
 tools_map = {
@@ -100,5 +127,8 @@ tools_map = {
     "get_system_stats": get_system_stats,
     "search_personal_notes": search_personal_notes,
     "take_screenshot": take_screenshot,
-    "open_app": open_app
+    "open_app": open_app,
+    "close_active_window": close_active_window,
+    "minimize_all_windows": minimize_all_windows,
+    "system_power_control": system_power_control
 }

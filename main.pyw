@@ -84,7 +84,7 @@ def run_jarvis():
             user_input = listen_pvrecorder(recorder, timeout_secs=6)
             
             if user_input:
-                if any(w in user_input.lower() for w in ["exit", "shutdown", "stop", "sleep", "go offline"]):
+                if any(w in user_input.lower() for w in ["exit", "shutdown assistant", "stop", "sleep", "go offline"]):
                     speak("Going offline, boss.")
                     break
 
@@ -113,6 +113,12 @@ def run_jarvis():
                                 action_desc = "take a screenshot"
                             elif fn_name == "open_app":
                                 action_desc = f"open the application {args.get('app_name', '')}"
+                            elif fn_name == "close_active_window":
+                                action_desc = "close the active window"
+                            elif fn_name == "minimize_all_windows":
+                                action_desc = "minimize all open windows"
+                            elif fn_name == "system_power_control":
+                                action_desc = f"perform system {args.get('action', 'power action')}"
 
                             # STRICT PERMISSION GUARD
                             if confirm_permission(action_desc, recorder):
