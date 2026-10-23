@@ -4,131 +4,130 @@ import webbrowser
 import pyautogui
 import pywhatkit
 import psutil
-from datetime import datetime
+import pyperclip
+import ollama
+from PIL import Image
 
-try:
-    from ctypes import POINTER, cast
-    from comtypes import CLSCTX_ALL
-    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-except ImportError:
-    pass
-
-from rag_tool import search_personal_notes
+# --- Desktop Automation & Tools ---
 
 def open_website(url: str) -> str:
-    """Opens a specified URL or website in the default web browser."""
-    if not url.startswith("http"):
-        url = f"https://www.{url}.com" if not url.endswith(".com") else f"https://{url}"
-    webbrowser.open_new_tab(url)
-    return f"Opened {url} in browser."
+    """Opens a specified website in the default web browser."""
+    try:
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = "https://" + url
+        webbrowser.open(url)
+        return f"Opening {url}, boss."
+    except Exception as e:
+        return f"Failed to open website: {e}"
 
 def play_youtube(topic: str) -> str:
-    """Searches and plays a video or song on YouTube."""
-    pywhatkit.playonyt(topic)
-    return f"Playing {topic} on YouTube."
+    """Searches and plays a video on YouTube based on the given topic."""
+    try:
+        pywhatkit.playonyt(topic)
+        return f"Playing {topic} on YouTube, boss."
+    except Exception as e:
+        return f"Failed to play YouTube video: {e}"
 
 def set_volume(level: int) -> str:
-    """Sets system volume percentage (0 to 100)."""
-    level = max(0, min(100, level))
+    """Sets the system volume to a percentage level between 0 and 100."""
     try:
-        devices = AudioUtilities.GetSpeakers()
-        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume = cast(interface, POINTER(IAudioEndpointVolume))
-        volume.SetMasterVolumeLevelScalar(level / 100.0, None)
-        return f"Volume set to {level}%."
-    except Exception:
-        return f"Adjusting volume level to {level}%."
-
-def get_system_stats() -> str:
-    """Gets real-time laptop battery level and CPU usage percentage."""
-    battery = psutil.sensors_battery()
-    cpu = psutil.cpu_percent(interval=1)
-    percent = battery.percent if battery else "Unknown"
-    return f"Battery is at {percent} percent, CPU usage is {cpu} percent."
+        level = max(0, min(100, level))
+        for _ in range(50):
+            pyautogui.press('volumedown')
+        steps = int(level / 2)
+        for _ in range(steps):
+            pyautogui.press('volumeup')
+        return f"Volume set to approximately {level} percent, boss."
+    except Exception as e:
+        return f"Failed to set volume: {e}"
 
 def take_screenshot() -> str:
-    """Takes a full-screen screenshot and saves it to the local screenshots folder."""
-    folder = "screenshots"
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-    
-    filename = datetime.now().strftime("screenshot_%Y%m%d_%H%M%S.png")
-    filepath = os.path.join(folder, filename)
-    
-    screenshot = pyautogui.screenshot()
-    screenshot.save(filepath)
-    return f"Screenshot saved successfully to {filepath}."
+    """Captures a screenshot of the current screen and saves it locally."""
+    try:
+        screenshots_dir = os.path.join(os.getcwd(), "screenshots")
+        os.makedirs(screenshots_dir, exist_ok=True)
+        filename = f"screenshot_{os.urandom(4).hex()}.png"
+        filepath = os.path.join(screenshots_dir, filename)
+        
+        image = pyautogui.screenshot()
+        image.save(filepath)
+        return f"Screenshot saved successfully at {filepath}, boss."
+    except Exception as e:
+        return f"Failed to take screenshot: {e}"
+
+def analyze_screen(prompt: str = "Describe what is currently visible on the screen in detail.") -> str:
+    """Captures a screenshot and analyzes screen contents using llama3.2-vision."""
+    try:
+        screenshots_dir = os.path.join(os.getcwd(), "screenshots")
+        os.makedirs(screenshots_dir, exist_ok=True)
+        filepath = os.path.join(screenshots_dir, "temp_vision.png")
+        
+        # Capture active screen
+        image = pyautogui.screenshot()
+        image.save(filepath)
+
+        # Analyze image using Ollama vision model
+        res = ollama.chat(
+            model="llama3.2-vision",
+            messages=[{
+                'role': 'user',
+                'content': prompt,
+                'images': [filepath]
+            }]
+        )
+        return res['message']['content']
+    except Exception as e:
+        return f"Screen vision analysis failed. Ensure llama3.2-vision is pulled via Ollama. Error: {e}"
+
+def read_clipboard() -> str:
+    """Reads text content currently saved on the system clipboard."""
+    try:
+        content = pyperclip.paste()
+        if not content.strip():
+            return "The clipboard is currently empty, boss."
+        return f"Clipboard text: {content}"
+    except Exception as e:
+        return f"Failed to read clipboard: {e}"
+
+def copy_to_clipboard(text: str) -> str:
+    """Copies specified text to the system clipboard."""
+    try:
+        pyperclip.copy(text)
+        return "Text copied to clipboard, boss."
+    except Exception as e:
+        return f"Failed to copy to clipboard: {e}"
 
 def open_app(app_name: str) -> str:
-    """Launches local desktop applications like Notepad, Calculator, VS Code, or File Explorer."""
-    app_map = {
-        "notepad": "notepad.exe",
-        "calculator": "calc.exe",
-        "calc": "calc.exe",
-        "explorer": "explorer.exe",
-        "file explorer": "explorer.exe",
-        "cmd": "cmd.exe",
-        "terminal": "cmd.exe",
-        "code": "code",
-        "vscode": "code",
-    }
-    
-    name = app_name.lower().strip()
-    executable = app_map.get(name, name)
-    
+    """Launches common desktop applications by name."""
+    app_lower = app_name.lower()
     try:
-        subprocess.Popen(executable, shell=True)
-        return f"Opened application {app_name}."
+        if "notepad" in app_lower:
+            subprocess.Popen(["notepad.exe"])
+        elif "calculator" in app_lower or "calc" in app_lower:
+            subprocess.Popen(["calc.exe"])
+        elif "cmd" in app_lower or "command prompt" in app_lower or "terminal" in app_lower:
+            subprocess.Popen(["cmd.exe"])
+        elif "code" in app_lower or "vscode" in app_lower or "vs code" in app_lower:
+            os.system("code")
+        else:
+            pyautogui.press('win')
+            pyautogui.sleep(0.5)
+            pyautogui.write(app_name)
+            pyautogui.sleep(0.5)
+            pyautogui.press('enter')
+        return f"Opening {app_name}, boss."
     except Exception as e:
-        return f"Could not launch application {app_name}: {str(e)}"
+        return f"Failed to open application {app_name}: {e}"
 
 def close_active_window() -> str:
-    """Closes the currently focused active window or application tab."""
-    pyautogui.hotkey('alt', 'f4')
-    return "Closed active window."
+    """Closes the currently focused active application window."""
+    try:
+        pyautogui.hotkey('alt', 'f4')
+        return "Closed the active window, boss."
+    except Exception as e:
+        return f"Failed to close active window: {e}"
 
-def minimize_all_windows() -> str:
-    """Minimizes all open windows to show the desktop."""
-    pyautogui.hotkey('win', 'd')
-    return "Minimized all windows."
-
-def system_power_control(action: str) -> str:
-    """Controls laptop power states: shutdown, restart, or lock screen."""
-    act = action.lower().strip()
-    if "shutdown" in act:
-        os.system("shutdown /s /t 10")
-        return "Initiating laptop shutdown in 10 seconds."
-    elif "restart" in act:
-        os.system("shutdown /r /t 10")
-        return "Initiating laptop restart in 10 seconds."
-    elif "lock" in act:
-        os.system("rundll32.exe user32.dll,LockWorkStation")
-        return "Laptop locked."
-    return f"Unknown power action: {action}"
-
-# Register tools for Ollama
-tools_list = [
-    open_website,
-    play_youtube,
-    set_volume,
-    get_system_stats,
-    search_personal_notes,
-    take_screenshot,
-    open_app,
-    close_active_window,
-    minimize_all_windows,
-    system_power_control
-]
-
-tools_map = {
-    "open_website": open_website,
-    "play_youtube": play_youtube,
-    "set_volume": set_volume,
-    "get_system_stats": get_system_stats,
-    "search_personal_notes": search_personal_notes,
-    "take_screenshot": take_screenshot,
-    "open_app": open_app,
-    "close_active_window": close_active_window,
-    "minimize_all_windows": minimize_all_windows,
-    "system_power_control": system_power_control
-}
+def minimize_all_windows(*args, **kwargs) -> str:
+    """Minimizes all open windows to reveal the desktop."""
+    try:
+        pyautogui.
