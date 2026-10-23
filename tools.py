@@ -186,17 +186,13 @@ def system_power_control(action: str) -> str:
         return f"Failed to execute system power control: {e}"
 
 def scroll_page(direction: str = "down") -> str:
-    """Scrolls the web browser or active window up or down."""
+    """Scrolls the web browser or active window up or down safely without clicking."""
     try:
-        screenWidth, screenHeight = pyautogui.size()
-        pyautogui.click(int(screenWidth * 0.3), int(screenHeight * 0.5))
-        pyautogui.sleep(0.2)
-        
         if direction.lower() in ["up", "top"]:
-            pyautogui.scroll(800)
+            pyautogui.press('pageup')
             return "Scrolled up, boss."
         else:
-            pyautogui.scroll(-800)
+            pyautogui.press('pagedown')
             return "Scrolled down, boss."
     except Exception as e:
         return f"Failed to scroll: {e}"
