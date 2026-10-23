@@ -41,6 +41,40 @@ def set_volume(level: int) -> str:
     except Exception as e:
         return f"Failed to set volume: {e}"
 
+def volume_up() -> str:
+    """Increases system volume."""
+    try:
+        for _ in range(5):
+            pyautogui.press('volumeup')
+        return "Increased volume, boss."
+    except Exception as e:
+        return f"Failed to increase volume: {e}"
+
+def volume_down() -> str:
+    """Decreases system volume."""
+    try:
+        for _ in range(5):
+            pyautogui.press('volumedown')
+        return "Decreased volume, boss."
+    except Exception as e:
+        return f"Failed to decrease volume: {e}"
+
+def toggle_play_pause() -> str:
+    """Toggles media play/pause on Windows."""
+    try:
+        pyautogui.press('playpause')
+        return "Toggled play pause, boss."
+    except Exception as e:
+        return f"Failed to toggle play pause: {e}"
+
+def toggle_full_screen() -> str:
+    """Toggles full screen mode on active window (YouTube/Browser/Media)."""
+    try:
+        pyautogui.press('f')
+        return "Toggled full screen, boss."
+    except Exception as e:
+        return f"Failed to toggle full screen: {e}"
+
 def take_screenshot() -> str:
     """Captures a screenshot of the current screen and saves it locally."""
     try:
@@ -56,19 +90,17 @@ def take_screenshot() -> str:
         return f"Failed to take screenshot: {e}"
 
 def analyze_screen(prompt: str = "Describe what is currently visible on the screen in detail.") -> str:
-    """Captures a screenshot and analyzes screen contents using llama3.2-vision."""
+    """Captures a screenshot and analyzes screen contents using llava."""
     try:
         screenshots_dir = os.path.join(os.getcwd(), "screenshots")
         os.makedirs(screenshots_dir, exist_ok=True)
         filepath = os.path.join(screenshots_dir, "temp_vision.png")
         
-        # Capture active screen
         image = pyautogui.screenshot()
         image.save(filepath)
 
-        # Analyze image using Ollama vision model
         res = ollama.chat(
-            model="llama3.2-vision",
+            model="llava",
             messages=[{
                 'role': 'user',
                 'content': prompt,
@@ -77,7 +109,7 @@ def analyze_screen(prompt: str = "Describe what is currently visible on the scre
         )
         return res['message']['content']
     except Exception as e:
-        return f"Screen vision analysis failed. Ensure llama3.2-vision is pulled via Ollama. Error: {e}"
+        return f"Screen vision analysis failed. Error: {e}"
 
 def read_clipboard() -> str:
     """Reads text content currently saved on the system clipboard."""
@@ -130,4 +162,99 @@ def close_active_window() -> str:
 def minimize_all_windows(*args, **kwargs) -> str:
     """Minimizes all open windows to reveal the desktop."""
     try:
-        pyautogui.
+        pyautogui.hotkey('win', 'd')
+        return "Minimized all windows, boss."
+    except Exception as e:
+        return f"Failed to minimize windows: {e}"
+
+def system_power_control(action: str) -> str:
+    """Executes Windows system power operations: shutdown, restart, or lock."""
+    action_lower = action.lower()
+    try:
+        if "shutdown" in action_lower:
+            os.system("shutdown /s /t 5")
+            return "System shutting down in 5 seconds, boss."
+        elif "restart" in action_lower:
+            os.system("shutdown /r /t 5")
+            return "System restarting in 5 seconds, boss."
+        elif "lock" in action_lower:
+            os.system("rundll32.exe user32.dll,LockWorkStation")
+            return "Locking system workstation, boss."
+        else:
+            return f"Unknown power action requested: {action}"
+    except Exception as e:
+        return f"Failed to execute system power control: {e}"
+
+def scroll_page(direction: str = "down") -> str:
+    """Scrolls the web browser or active window up or down."""
+    try:
+        screenWidth, screenHeight = pyautogui.size()
+        pyautogui.click(int(screenWidth * 0.3), int(screenHeight * 0.5))
+        pyautogui.sleep(0.2)
+        
+        if direction.lower() in ["up", "top"]:
+            pyautogui.scroll(800)
+            return "Scrolled up, boss."
+        else:
+            pyautogui.scroll(-800)
+            return "Scrolled down, boss."
+    except Exception as e:
+        return f"Failed to scroll: {e}"
+
+def skip_youtube_ad() -> str:
+    """Focuses YouTube video player and navigates Tab focus to trigger the Skip Ad button."""
+    try:
+        screenWidth, screenHeight = pyautogui.size()
+        pyautogui.click(int(screenWidth * 0.4), int(screenHeight * 0.4))
+        pyautogui.sleep(0.2)
+        
+        for _ in range(4):
+            pyautogui.press('tab')
+            pyautogui.sleep(0.05)
+        
+        pyautogui.press('enter')
+        return "Attempted to skip YouTube ad, boss."
+    except Exception as e:
+        return f"Failed to skip YouTube ad: {e}"
+
+# Master Tool Registry
+tools_list = [
+    open_website,
+    play_youtube,
+    set_volume,
+    volume_up,
+    volume_down,
+    toggle_play_pause,
+    toggle_full_screen,
+    take_screenshot,
+    analyze_screen,
+    read_clipboard,
+    copy_to_clipboard,
+    open_app,
+    close_active_window,
+    minimize_all_windows,
+    system_power_control,
+    scroll_page,
+    skip_youtube_ad
+]
+
+tools_map = {
+    "open_website": open_website,
+    "play_youtube": play_youtube,
+    "set_volume": set_volume,
+    "volume_up": volume_up,
+    "volume_down": volume_down,
+    "toggle_play_pause": toggle_play_pause,
+    "toggle_full_screen": toggle_full_screen,
+    "take_screenshot": take_screenshot,
+    "analyze_screen": analyze_screen,
+    "read_clipboard": read_clipboard,
+    "copy_to_clipboard": copy_to_clipboard,
+    "open_app": open_app,
+    "close_active_window": close_active_window,
+    "minimize_all_windows": minimize_all_windows,
+    "scroll_page": scroll_page,
+    "skip_youtube_ad": skip_youtube_ad,
+    "minimize_window": minimize_all_windows,
+    "minimize": minimize_all_windows
+}

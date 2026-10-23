@@ -63,6 +63,14 @@ def process_voice_command(user_input: str, messages: list):
         active_tools = [tools_map["minimize_all_windows"]]
     elif "close" in user_lower:
         active_tools = [tools_map["close_active_window"]]
+    elif any(kw in user_lower for kw in ["full screen", "fullscreen"]):
+        active_tools = [tools_map["toggle_full_screen"]]
+    elif any(kw in user_lower for kw in ["pause", "play video", "resume"]):
+        active_tools = [tools_map["toggle_play_pause"]]
+    elif any(kw in user_lower for kw in ["increase volume", "volume up", "louder"]):
+        active_tools = [tools_map["volume_up"]]
+    elif any(kw in user_lower for kw in ["decrease volume", "volume down", "quieter"]):
+        active_tools = [tools_map["volume_down"]]
     elif any(kw in user_lower for kw in ["clipboard", "copy", "paste"]):
         active_tools = [tools_map["read_clipboard"], tools_map["copy_to_clipboard"]]
     elif any(kw in user_lower for kw in ["screen", "look at my screen", "see screen"]):
@@ -126,11 +134,9 @@ def run_jarvis():
 
     speak("JARVIS fully active and continuously listening, boss.")
 
-    # Run system tray icon in background
     tray_thread = threading.Thread(target=create_tray_icon, daemon=True)
     tray_thread.start()
 
-    # Continuous hands-free listening loop
     try:
         while True:
             user_input = listen_pvrecorder(recorder, timeout_secs=5)
