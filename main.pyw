@@ -132,7 +132,7 @@ def run_jarvis():
         }
     ]
 
-    speak("JARVIS fully active and continuously listening, boss.")
+    speak("Welcome back, Boss. Your digital assistant is online, fully initialized, and ready to assist. I'm listening.")
 
     tray_thread = threading.Thread(target=create_tray_icon, daemon=True)
     tray_thread.start()
